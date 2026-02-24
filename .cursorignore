@@ -1,0 +1,11 @@
+# Google OAuth secrets
+credentials.json
+token.json
+
+# Optional: ignore any future auth files
+*.oauth.json
+*.secret.json
+
+# Optional: ignore environment files
+.env
+.env.*

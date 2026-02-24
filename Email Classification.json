@@ -1,0 +1,627 @@
+{
+  "name": "Email Classification copy",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -848,
+        -320
+      ],
+      "id": "7ae8265c-7489-4a12-a3f5-bbbfd2dd4574",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "id, Subject, snippet, From",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -400,
+        -464
+      ],
+      "id": "dc7e312f-6785-4360-81fb-21c82fc096c4",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Subject: {{ $json.Subject }}\nBody: {{ $json.snippet }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are an accurate email triage classifier.\n\nGiven an email's subject and body text, choose exactly ONE of these categories:\n\n1. AUTH_VERIFICATION_ALERT – sign-in codes, OTPs, security alerts, new device notifications\n2. TRANSACTION_ALERT – debit/credit transactions, transfers, account movements\n3. REFUNDS_REWARDS – refunds, cashback, loyalty points, IndiGo BluChips, etc.\n4. ADS – promotions, advertisements, offers, or sales\n5. UPDATES_NEWSLETTERS – product/news/welcome/policy updates, warranty info, newsletters, onboarding after signup\n6. AMAZON_PAY – Amazon Pay wallet or cashback–specific mails\n7. AUTO_DEBIT_REMINDERS – auto-pay or upcoming payment reminders\n8. JOB_OPPORTUNITIES – recruiter mails, job alerts, interview calls\n9. ORDERS_SUBSCRIPTIONS – product orders, deliveries, subscription purchases, invoices, and payment receipts\n10. INVESTMENTS_FINANCIAL_UPDATES – trading/investments, dividends, postal ballots, e-voting/AGM notices\n11. BANKING_FINANCIAL_OFFERS – bank/credit/loan offers or financial product promotions\n12. BANK_STATEMENTS – monthly e-statements for bank or credit-card accounts\n13. TRAVEL_BOOKINGS – itineraries, bookings, boarding passes, hotels\n14. OTHERS – everything else not covered above\n\nOutput strictly in JSON:\n{\n  \"category\": \"<exactly one of the above>\",\n  \"reason_short\": \"≤12 words why this category fits best\"\n}\n\nExamples:\n\nSubject: \"Your login code is 824391\"\nBody: \"Use this code to sign in.\"\n→ {\"category\":\"AUTH_VERIFICATION_ALERT\",\"reason_short\":\"one-time sign-in code\"}\n\nSubject: \"₹5000 debited from your HDFC Bank account\"\n→ {\"category\":\"TRANSACTION_ALERT\",\"reason_short\":\"debit transaction notification\"}\n\nSubject: \"Refund of ₹499 initiated\"\n→ {\"category\":\"REFUNDS_REWARDS\",\"reason_short\":\"refund credited to account\"}\n\nSubject: \"Diwali Mega Sale—Up to 60% Off Laptops\"\n→ {\"category\":\"ADS\",\"reason_short\":\"festive promotional offer\"}\n\nSubject: \"Welcome to Zomato Gold!\"\n→ {\"category\":\"UPDATES_NEWSLETTERS\",\"reason_short\":\"welcome email after signup\"}\n\nSubject: \"Annual Privacy Notice 2025\"\n→ {\"category\":\"UPDATES_NEWSLETTERS\",\"reason_short\":\"policy update notification\"}\n\nSubject: \"Invoice for your purchase\"\n→ {\"category\":\"ORDERS_SUBSCRIPTIONS\",\"reason_short\":\"purchase invoice confirmation\"}\n\nSubject: \"Your HDFC Bank Credit Card Statement – October 2025\"\n→ {\"category\":\"BANK_STATEMENTS\",\"reason_short\":\"monthly credit card e-statement\"}\n\nSubject: \"e-Voting for ABC Ltd – AGM 2025\"\n→ {\"category\":\"INVESTMENTS_FINANCIAL_UPDATES\",\"reason_short\":\"shareholder e-voting/AGM notice\"}\n\nSubject: \"Zerodha: Dividend credited for TCS\"\n→ {\"category\":\"INVESTMENTS_FINANCIAL_UPDATES\",\"reason_short\":\"dividend credited to demat\"}\n\nSubject: \"Your Amazon order #123-456 has shipped\"\n→ {\"category\":\"ORDERS_SUBSCRIPTIONS\",\"reason_short\":\"order shipment notification\"}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        -176,
+        -416
+      ],
+      "id": "40d39ced-7a60-4ced-a0ec-c84984ece4fe",
+      "name": "AI Agent",
+      "retryOnFail": false,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Telegram likes MarkdownV2. We'll escape safely for visible text only.\nfunction escapeMDv2(s = \"\") {\n  return String(s).replace(/([_*\\[\\]()~`>#+\\-=|{}.!\\\\])/g, '\\\\$1');\n}\n\nconst items = $input.all();\nconst maxBody = 200; // truncate long bodies for readability\n\nconst lines = items.map((it, i) => {\n  const j = it.json;\n\n  return `${i + 1}. *${escapeMDv2(j.output.category)}* — ${escapeMDv2(j.output.reason_short)}\n*Subject:* ${escapeMDv2(j.subject)}`;\n});\n\nconst header = `*Email Triage Summary (${escapeMDv2(new Date().toLocaleString())})*`;\n\nreturn [\n  {\n    json: {\n      text: `${header}\\n\\n${lines.join(\"\\n\\n\")}`\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        -128
+      ],
+      "id": "f2fe944c-6cb5-458d-96d6-6b1fc74f87b2",
+      "name": "Code in JavaScript",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "5f0a3d8f-74a0-4ae9-9dc7-e1f984402fa5",
+              "name": "id",
+              "value": "={{$json[\"id\"]}}",
+              "type": "string"
+            },
+            {
+              "id": "f37b97f2-d395-44f1-8954-860c5e19c0bf",
+              "name": "from",
+              "value": "={{$json[\"From\"]}}",
+              "type": "string"
+            },
+            {
+              "id": "c63e5e8e-a511-4bda-85c8-1d89eada8d8f",
+              "name": "subject",
+              "value": "={{$json[\"Subject\"]}}",
+              "type": "string"
+            },
+            {
+              "id": "5a4db24e-c7c2-4627-a94a-18bb0371f328",
+              "name": "body",
+              "value": "={{$json[\"snippet\"]}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -112,
+        -608
+      ],
+      "id": "2aa24c66-2c53-4e92-8763-66d79ee58084",
+      "name": "Gmail fields"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        176,
+        -464
+      ],
+      "id": "30a075c5-48db-4e67-82ca-d407c3b71bbb",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "chatId": "5529123558",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        848,
+        -128
+      ],
+      "id": "cbb0e530-c2ab-4c22-9bab-6460e6e7c2cb",
+      "name": "Send a text message",
+      "webhookId": "637bdd76-03a4-45b3-9534-5218ba7116f6",
+      "notesInFlow": false,
+      "credentials": {
+        "telegramApi": {
+          "id": "RbcoJkpcrW2ssN5A",
+          "name": "Telegram account"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "filters": {
+          "readStatus": "unread"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -624,
+        -464
+      ],
+      "id": "daf89333-5585-4b42-8886-34f3fd2a89af",
+      "name": "Get many messages",
+      "webhookId": "f9f8a708-9729-447e-a587-cf0d5aee57f4",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "8oznO5TRD7SwVmEW",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "label"
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -112,
+        -16
+      ],
+      "id": "d3ea432d-f240-42e3-9263-00875d13f7cf",
+      "name": "Get many labels",
+      "webhookId": "f426d6a3-3c55-4114-8358-400cb8e493d8",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "8oznO5TRD7SwVmEW",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "87cdd107-cae2-4147-be4e-80eb5cd9127a",
+              "name": "label_id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "4b5835f0-f52f-4226-9723-6872bbba5df1",
+              "name": "label_name",
+              "value": "={{ $json.name }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        176,
+        -16
+      ],
+      "id": "2f501abd-bc0e-42fd-8aad-9eecba3322be",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "mode": "combineBySql",
+        "query": "SELECT a.*, b.*\nfrom input1 a\nleft join input2 b\non a.output.category=b.label_name;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        400,
+        -304
+      ],
+      "id": "898e897a-e42e-481e-a767-6e088a57f181",
+      "name": "Merge Labels",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "model": "qwen2.5:14b",
+        "options": {
+          "temperature": 0
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        -176,
+        -192
+      ],
+      "id": "bde1a57b-fd91-4454-ab68-4603e5785cd8",
+      "name": "Qwen",
+      "credentials": {
+        "ollamaApi": {
+          "id": "dfQT1Wj8Powt9Spj",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"category\": {\n      \"type\": \"string\",\n      \"enum\": [\n        \"AUTH_VERIFICATION_ALERT\",\n        \"TRANSACTION_ALERT\",\n        \"REFUNDS_REWARDS\",\n        \"ADS\",\n        \"UPDATES_NEWSLETTERS\",\n        \"AMAZON_PAY\",\n        \"AUTO_DEBIT_REMINDERS\",\n        \"JOB_OPPORTUNITIES\",\n        \"ORDERS_SUBSCRIPTIONS\",\n        \"INVESTMENTS_FINANCIAL_UPDATES\",\n        \"BANKING_FINANCIAL_OFFERS\",\n        \"BANK_STATEMENTS\",\n        \"TRAVEL_BOOKINGS\",\n        \"OTHERS\"\n      ]\n    },\n    \"reason_short\": {\n      \"type\": \"string\",\n      \"maxLength\": 80\n    }\n  },\n  \"required\": [\"category\", \"reason_short\"],\n  \"additionalProperties\": false\n}\n"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        -32,
+        -192
+      ],
+      "id": "1c4350fc-5d27-477a-993b-1598dda49fe1",
+      "name": "Structured Output"
+    },
+    {
+      "parameters": {
+        "operation": "addLabels",
+        "messageId": "={{ $json.id }}",
+        "labelIds": "={{ [$json.label_id] }}"
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        624,
+        -512
+      ],
+      "id": "20902d13-b09c-43f9-8f98-65ea9121db7d",
+      "name": "Add label to message",
+      "webhookId": "ef3f241c-c268-427c-ad0f-a12d8325f760",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "8oznO5TRD7SwVmEW",
+          "name": "Gmail account 2"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "classified_emails",
+          "mode": "list",
+          "cachedResultName": "classified_emails"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}",
+            "from_email": "={{ $json.from }}",
+            "body": "={{ $json.body }}",
+            "subject": "={{ $json.subject }}",
+            "category": "={{ $json.output.category }}",
+            "reason_short": "={{ $json.output.reason_short }}",
+            "label_id": "={{ $json.label_id }}",
+            "label_name": "={{ $json.label_name }}",
+            "created_at": "={{ (new Date()).toISOString().split('T')[0] }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": true,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "from_email",
+              "displayName": "from_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "subject",
+              "displayName": "subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "body",
+              "displayName": "body",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reason_short",
+              "displayName": "reason_short",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "label_id",
+              "displayName": "label_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "label_name",
+              "displayName": "label_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "skipOnConflict": true
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        624,
+        -304
+      ],
+      "id": "fe300bfd-0dd4-409d-adfd-0ed0902cbb4a",
+      "name": "Insert rows in a table",
+      "credentials": {
+        "postgres": {
+          "id": "w8P4Wx1TY8O1cacd",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "markAsRead",
+        "messageId": "={{ $json.id }}"
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        848,
+        -512
+      ],
+      "id": "899d8ee7-06ac-4ead-9e5f-a3c53c840737",
+      "name": "Mark a message as read",
+      "webhookId": "bc7f76a6-6343-4d70-9092-2debdcba1ee5",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "8oznO5TRD7SwVmEW",
+          "name": "Gmail account 2"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Get many messages",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get many labels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gmail fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail fields": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Merge Labels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many messages": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many labels": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Merge Labels",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Qwen": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Labels": {
+      "main": [
+        [
+          {
+            "node": "Add label to message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Insert rows in a table",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add label to message": {
+      "main": [
+        [
+          {
+            "node": "Mark a message as read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "b5cbaf6b-973a-489f-a1de-124b74141a26",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "2c9e6b6f03d244c319dcdda56fb2547deda89eeaf5b0290c3c79d75b7ff6c5fc"
+  },
+  "id": "MeUjqrhGKZDCMkyx",
+  "tags": []
+}

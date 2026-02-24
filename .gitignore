@@ -1,0 +1,30 @@
+# Google OAuth
+credentials.json
+token.json
+*.oauth.json
+*.secret.json
+
+# Environment
+.venv
+venv
+env
+.env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Optional: uncomment to avoid committing large CSVs
+# *.csv
