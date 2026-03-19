@@ -63,7 +63,4 @@ Fetches every unread inbox email, classifies with Ollama, applies labels, marks 
 - `gmail_utils.py` – Gmail API auth, listing/fetching messages, parsing payloads.
 - `classifier.py` – Ollama client and `classify_email()` using structured output.
 - `prompts.py` – System prompt and Pydantic schema (categories and `reason_short`).
-   git remote add origin https://github.com/YOUR_USERNAME/EMAIL_REPO_NAME.git
-   git branch -M main
-   git push -u origin main
    ```
