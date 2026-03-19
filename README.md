@@ -11,33 +11,53 @@ Fetches recent emails from Gmail and tags each with a category using a local LLM
 
 ## Setup
 
-1. **Python** – Use a venv and install dependencies:
-   ```bash
-   python -m venv .venv
-   .venv\Scripts\activate   # Windows
-   pip install -r requirements.txt
-   ```
-
-2. **Gmail** – In Google Cloud Console, create OAuth credentials (Desktop app), download as `credentials.json`, and place it in the project root. On first run you’ll sign in in the browser; a `token.json` will be created.
-
-3. **Ollama** – Install [Ollama](https://ollama.ai), then pull the model used by the script (default: `qwen2.5:14b`):
-   ```bash
-   ollama pull qwen2.5:14b
-   ```
-
-4. **Gmail labels** – In Gmail, create labels whose **names** exactly match the categories (e.g. `TRANSACTION_ALERT`, `ORDERS_SUBSCRIPTIONS`, `OTHERS`). Only messages whose predicted category matches an existing label will get that label applied.
-
-## Run
-
-From the project root:
+### 1. Python environment
 
 ```bash
-python fetch_recent_emails.py
+python -m venv .venv
+.venv\Scripts\activate   # Windows
+pip install -r requirements.txt
 ```
 
-Config is at the top of `fetch_recent_emails.py`: `MAX_EMAILS`, `QUERY`, output paths, and `APPLY_TO_GMAIL` (set to `False` to only generate CSVs and skip Gmail updates).
+### 2. Gmail OAuth
 
-## Project layout
+1. In [Google Cloud Console](https://console.cloud.google.com/), create a project and enable the Gmail API.
+2. Create OAuth 2.0 credentials (Desktop app), download as **`credentials.json`**, and place it in the project root.
+3. On the **first run**, a browser window will open for you to sign in. After authorising, a **`token.json`** is created automatically — this stores your access token so you don't need to sign in again.
+
+> `credentials.json` is the app identity (safe to keep private, never changes).  
+> `token.json` is your personal access token (auto-refreshed when it expires).  
+> Both are listed in `.gitignore` and will never be committed.
+
+### 3. Ollama
+
+Install [Ollama](https://ollama.ai), then pull the default model:
+
+```bash
+ollama pull qwen2.5:14b
+```
+
+### 4. Gmail labels
+
+In Gmail Settings → Labels, create labels whose names **exactly match** the category names defined in `utils/prompts.py` (e.g. `TRANSACTION_ALERT`, `OTP_AND_VERIFICATION`, `ADS`). The script prints which labels are missing on startup — any missing categories are still classified but the label won't be applied in Gmail.
+
+---
+
+## Usage
+
+### Daily run — tag all unread emails
+
+```bash
+python run.py
+```
+
+Fetches every unread inbox email, classifies with Ollama, applies labels, marks as read.
+
+| Flag | Default | Description |
+|---|---|---|
+| `--max N` | None (all) | Cap the number of unread emails |
+| `--dry-run` | off | Classify only, skip Gmail updates |
+| `--model MODEL` | `qwen2.5:14b` | Ollama model to use |
 
 - `fetch_recent_emails.py` – Entry point: fetch → classify → save → optionally apply labels.
 - `gmail_utils.py` – Gmail API auth, listing/fetching messages, parsing payloads.
@@ -47,5 +67,3 @@ Config is at the top of `fetch_recent_emails.py`: `MAX_EMAILS`, `QUERY`, output 
    git branch -M main
    git push -u origin main
    ```
-
-Keep `credentials.json` and `token.json` out of version control (they are listed in `.gitignore`).

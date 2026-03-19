@@ -6,7 +6,7 @@ import logging
 
 from openai import OpenAI
 
-from prompts import EmailClassification, SYSTEM_PROMPT
+from .prompts import EmailClassification, SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 

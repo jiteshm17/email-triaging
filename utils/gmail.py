@@ -94,22 +94,24 @@ def list_message_ids(
     service,
     q: str = "",
     label_ids: list[str] | None = None,
-    max_fetch: int = 500,
+    max_fetch: int | None = None,
 ) -> list[str]:
+    """Return message IDs matching the query. Pass max_fetch=None to fetch all."""
     ids = []
     page_token = None
     label_ids = label_ids or []
     while True:
+        batch = min(500, max_fetch - len(ids)) if max_fetch is not None else 500
         resp = service.users().messages().list(
             userId="me",
             q=q,
             labelIds=label_ids,
             pageToken=page_token,
-            maxResults=min(500, max_fetch - len(ids)),
+            maxResults=batch,
         ).execute()
         for m in resp.get("messages", []):
             ids.append(m["id"])
-            if len(ids) >= max_fetch:
+            if max_fetch is not None and len(ids) >= max_fetch:
                 return ids
         page_token = resp.get("nextPageToken")
         if not page_token:
