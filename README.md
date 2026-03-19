@@ -1,19 +1,13 @@
 # Email Triaging
 
-A personal tool to keep Gmail organised. Fetches emails, classifies each into one of 16 categories using a local LLM (Ollama), and applies the matching Gmail label while marking the message as read — no third-party cloud services involved.
-
----
+Fetches recent emails from Gmail and tags each with a category using a local LLM (Ollama). Applies the category as a Gmail label
 
 ## What it does
 
-1. **Fetch** – Connects to Gmail via OAuth and downloads email headers + body text.
-2. **Classify** – Sends subject + body to a locally-running Ollama model; gets back a category and a short reason.
-3. **Save** – Writes raw and tagged CSVs to `data/` for inspection.
-4. **Apply** – Adds the predicted category as a Gmail label and marks the message as read (same effect as an n8n "Add label → Mark as read" flow).
-
-Raw emails are **cached** in `data/` so re-running only redoes classification — useful when tweaking the prompt without re-downloading.
-
----
+1. **Fetch** – Connects to Gmail (OAuth), lists recent messages in the inbox, and downloads each message’s headers and body.
+2. **Tag** – Sends subject + body to Ollama (OpenAI-compatible API) and gets a single category and short reason per email.
+3. **Save** – Writes a raw CSV of fetched emails and a tagged CSV with `category` and `reason`.
+4. **Apply** – For each tagged email, adds the category as a Gmail label
 
 ## Setup
 
@@ -65,124 +59,11 @@ Fetches every unread inbox email, classifies with Ollama, applies labels, marks 
 | `--dry-run` | off | Classify only, skip Gmail updates |
 | `--model MODEL` | `qwen2.5:14b` | Ollama model to use |
 
-```bash
-python run.py --max 200          # process at most 200 unread emails
-python run.py --dry-run          # test without touching Gmail
-python run.py --model llama3:8b  # use a different model
-```
-
-To force a fresh download (e.g. to pick up new emails after a dry run):
-```bash
-del data\gmail_unread.csv        # Windows
-rm data/gmail_unread.csv         # macOS/Linux
-python run.py
-```
-
----
-
-### Backfill — tag recent emails (read + unread)
-
-```bash
-python tag_recent.py
-```
-
-Fetches recent inbox emails regardless of read status. Useful for a one-off backfill.
-
-| Flag | Default | Description |
-|---|---|---|
-| `--max N` | `1000` | Number of recent emails to fetch |
-| `--dry-run` | off | Classify only, skip Gmail updates |
-| `--model MODEL` | `qwen2.5:14b` | Ollama model to use |
-
-```bash
-python tag_recent.py --max 500
-python tag_recent.py --max 2000 --dry-run
-```
-
----
-
-### Build a labelled dataset (for prompt optimisation)
-
-```bash
-python build_dataset.py
-```
-
-Scans recent emails, keeps only those that already have a custom Gmail label applied, and saves them as a CSV. This is the training data used for prompt optimisation.
-
-| Flag | Default | Description |
-|---|---|---|
-| `--max N` | `5000` | Emails to scan |
-| `--query Q` | `in:inbox` | Gmail query (e.g. `in:anywhere`) |
-| `--out PATH` | `data/gmail_tagged_emails.csv` | Output path |
-
----
-
-### Sample a subset for labelling / review
-
-```bash
-python sample_dataset.py data/gmail_tagged_emails.csv
-```
-
-Samples N rows per category for manual review or prompt evaluation.
-
-| Flag | Default | Description |
-|---|---|---|
-| `--n N` | `20` | Rows per category |
-| `--seed SEED` | `42` | Random seed (use `0` for a completely different sample) |
-| `--data-dir DIR` | `data` | Output directory |
-
-Output is saved as `<input_name>_sampled.csv` in the data directory.
-
----
-
-### Optimise the prompt with DSPy
-
-```bash
-python optimize.py
-```
-
-Uses [DSPy MIPROv2](https://dspy.ai) to search for a better prompt instruction by evaluating candidate rewrites against human-corrected labels. Requires two CSVs: a features file and a ground-truth labels file (see `data/`).
-
-| Flag | Default | Description |
-|---|---|---|
-| `--sample CSV` | `data/gmail_tagged_sample.csv` | Features CSV |
-| `--ground-truth CSV` | `data/gmail_tagged_sample_updated.csv` | Human-corrected labels CSV |
-| `--out-dir DIR` | `data/optimized` | Where to save the result |
-| `--model MODEL` | `qwen2.5:14b` | Ollama model |
-| `--effort LEVEL` | `light` | `light` (~70–90 min) / `medium` (~2–3 h) / `heavy` |
-
-> **Note:** Ollama processes one request at a time on a single GPU. More threads don't help — the default of 1 is optimal.
-
-The optimised program is saved to `data/optimized/optimized_classifier.json`. The winning instruction is also printed at the end so you can copy it back into `utils/prompts.py`.
-
----
-
-## Project layout
-
-```
-run.py               # Daily job: tag all unread emails
-tag_recent.py        # One-off backfill: tag N recent emails (read + unread)
-build_dataset.py     # Fetch already-labelled emails to build training data
-sample_dataset.py    # Sample N rows per category for review / optimisation
-optimize.py          # DSPy MIPROv2 prompt optimisation
-
-utils/
-  prompts.py         # System prompt, category list, Pydantic schema
-  gmail.py           # Gmail API auth, listing, fetching, parsing
-  classifier.py      # Ollama client + classify_email()
-
-notebooks/
-  eda.ipynb          # Label distribution analysis and dataset preparation
-
-data/                # All data files (gitignored — may contain personal email content)
-  gmail_unread.csv          # Cached raw unread emails (run.py)
-  gmail_unread_tagged.csv   # Classified unread emails
-  gmail_tagged_emails.csv   # Labelled dataset (build_dataset.py)
-  optimized/                # Saved optimised DSPy programs
-```
-
----
-
-## Contributing
-
-Pull requests, bug reports, and feature suggestions are welcome. If you extend the category list or improve the prompt, feel free to open a PR — this is a small personal project but happy to make it useful for others too.
+- `fetch_recent_emails.py` – Entry point: fetch → classify → save → optionally apply labels.
+- `gmail_utils.py` – Gmail API auth, listing/fetching messages, parsing payloads.
+- `classifier.py` – Ollama client and `classify_email()` using structured output.
+- `prompts.py` – System prompt and Pydantic schema (categories and `reason_short`).
+   git remote add origin https://github.com/YOUR_USERNAME/EMAIL_REPO_NAME.git
+   git branch -M main
+   git push -u origin main
+   ```
