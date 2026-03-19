@@ -1,13 +1,13 @@
 # Email Triaging
 
-Fetches recent emails from Gmail and tags each with a category using a local LLM (Ollama). Optionally applies the category as a Gmail label and marks messages as read.
+Fetches recent emails from Gmail and tags each with a category using a local LLM (Ollama). Applies the category as a Gmail label
 
 ## What it does
 
 1. **Fetch** – Connects to Gmail (OAuth), lists recent messages in the inbox, and downloads each message’s headers and body.
 2. **Tag** – Sends subject + body to Ollama (OpenAI-compatible API) and gets a single category and short reason per email.
 3. **Save** – Writes a raw CSV of fetched emails and a tagged CSV with `category` and `reason`.
-4. **Apply (optional)** – For each tagged email, adds the category as a Gmail label and marks the message as read (same idea as an n8n “Add label → Mark as read” flow).
+4. **Apply** – For each tagged email, adds the category as a Gmail label
 
 ## Setup
 
@@ -43,14 +43,6 @@ Config is at the top of `fetch_recent_emails.py`: `MAX_EMAILS`, `QUERY`, output 
 - `gmail_utils.py` – Gmail API auth, listing/fetching messages, parsing payloads.
 - `classifier.py` – Ollama client and `classify_email()` using structured output.
 - `prompts.py` – System prompt and Pydantic schema (categories and `reason_short`).
-
-## Pushing to GitHub
-
-The repo is already a Git repository. To push to GitHub:
-
-1. Create a new repository on GitHub (no need to add a README or .gitignore if you already have them locally).
-2. Add the remote and push:
-   ```bash
    git remote add origin https://github.com/YOUR_USERNAME/EMAIL_REPO_NAME.git
    git branch -M main
    git push -u origin main
