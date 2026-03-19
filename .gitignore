@@ -26,5 +26,8 @@ build/
 *.swp
 *.swo
 
-# Optional: uncomment to avoid committing large CSVs
-# *.csv
+# Data files — may contain personal email content, never commit
+data/
+*.csv
+*.parquet
+*.json
