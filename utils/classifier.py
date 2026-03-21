@@ -46,5 +46,5 @@ def classify_email(
         msg = comp.choices[0].message
         return msg.parsed.category, msg.parsed.reason_short
     except Exception as e:
-        logger.debug("Classification failed: %s", e)
+        logger.warning("Classification failed for subject %r: %s", subject[:60], e)
         return None, None

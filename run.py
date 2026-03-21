@@ -9,11 +9,11 @@ Usage:
     python run.py --all-tabs         # unread emails from ALL inbox tabs
     python run.py --max 200          # cap at 200 emails
     python run.py --dry-run          # classify only, skip applying labels to Gmail
+    python run.py --cache            # skip re-downloading if today's CSV already exists
     python run.py --model llama3:8b  # use a different Ollama model
 
-Raw emails are cached per-scope (primary / all) and date, so re-running skips the
-download and only redoes classification — useful when tweaking the prompt.
-Delete the matching data/gmail_unread_*.csv to force a fresh fetch.
+By default emails are always re-fetched from Gmail. Pass --cache to reuse today's
+existing CSV (useful when tweaking the prompt without waiting for a fresh download).
 """
 
 from __future__ import annotations
@@ -26,6 +26,8 @@ from typing import get_args
 
 import pandas as pd
 from tqdm.auto import tqdm
+
+import urllib.request
 
 from utils.gmail import (
     get_service,
@@ -46,13 +48,10 @@ DATA_DIR = "data"
 _DATE = datetime.now().strftime("%d%b%Y")   # e.g. 19Mar2026
 
 
-def _csv_paths(count: int, all_tabs: bool) -> tuple[str, str]:
-    """Return (raw_path, tagged_path).
-    Scope (primary vs all) is encoded in the name so both variants can coexist."""
+def _csv_path(all_tabs: bool) -> str:
+    """Single output file per scope+date. Classification columns are written in-place."""
     scope = "all" if all_tabs else "primary"
-    raw = f"{DATA_DIR}/gmail_unread_{scope}_{_DATE}.csv"
-    tagged = f"{DATA_DIR}/gmail_unread_{scope}_{_DATE}_{count}_tagged.csv"
-    return raw, tagged
+    return f"{DATA_DIR}/gmail_unread_{scope}_{_DATE}.csv"
 
 
 def parse_args() -> argparse.Namespace:
@@ -71,10 +70,28 @@ def parse_args() -> argparse.Namespace:
              "Default: Primary tab only.",
     )
     parser.add_argument(
+        "--cache", action="store_true",
+        help="Load from an existing CSV for today instead of re-fetching from Gmail. "
+             "Useful when tweaking the prompt without re-downloading.",
+    )
+    parser.add_argument(
         "--model", default=DEFAULT_MODEL, metavar="MODEL",
         help=f"Ollama model to use (default: {DEFAULT_MODEL})",
     )
     return parser.parse_args()
+
+
+def _check_ollama(base_url: str = "http://localhost:11434") -> None:
+    """Warn early if Ollama is unreachable — avoids silent None classifications."""
+    try:
+        urllib.request.urlopen(base_url, timeout=3)
+    except Exception as e:
+        logger.warning(
+            "Ollama not reachable at %s (%s). "
+            "All classifications will return None. "
+            "If running inside WSL2, see README for mirrored-networking setup.",
+            base_url, e,
+        )
 
 
 def _check_labels(name_to_id: dict) -> None:
@@ -113,6 +130,31 @@ def run_classification(df: pd.DataFrame, client, model: str) -> pd.DataFrame:
     return df
 
 
+def display_summary(df: pd.DataFrame) -> None:
+    """Print a human-readable classification report to stdout / logs."""
+    sep = "=" * 70
+    print(f"\n{sep}")
+    print(f"  CLASSIFICATION RESULTS  ({len(df)} emails)")
+    print(sep)
+
+    counts = df["category"].value_counts()
+    print("\nCategory breakdown:")
+    for cat, n in counts.items():
+        bar = "█" * n
+        print(f"  {cat:<35} {n:>4}  {bar}")
+
+    display_cols = [c for c in ("sender", "from", "subject", "category", "reason") if c in df.columns]
+    print(f"\nFull results ({', '.join(display_cols)}):")
+    pd.set_option("display.max_rows", None)
+    pd.set_option("display.max_colwidth", 60)
+    pd.set_option("display.width", 200)
+    print(df[display_cols].to_string(index=True))
+    pd.reset_option("display.max_rows")
+    pd.reset_option("display.max_colwidth")
+    pd.reset_option("display.width")
+    print(sep + "\n")
+
+
 def apply_labels_to_gmail(service, df: pd.DataFrame, name_to_id: dict) -> tuple[int, int, list]:
     applied, skipped, errors = 0, 0, []
     for _, row in tqdm(df.iterrows(), total=len(df), desc="Applying to Gmail"):
@@ -126,7 +168,7 @@ def apply_labels_to_gmail(service, df: pd.DataFrame, name_to_id: dict) -> tuple[
             skipped += 1
             continue
         try:
-            body = {"addLabelIds": [label_id], "removeLabelIds": ["UNREAD"]}
+            body = {"addLabelIds": [label_id]}
             service.users().messages().modify(userId="me", id=msg_id, body=body).execute()
             applied += 1
         except Exception as e:
@@ -142,31 +184,34 @@ def main() -> None:
     name_to_id = {name: lid for lid, name in id_to_name.items()}
 
     _check_labels(name_to_id)
+    _check_ollama()
 
     query = "in:inbox is:unread" if args.all_tabs else "in:inbox is:unread category:primary"
     logger.info("Fetching: %s", query)
 
-    # Raw cache encodes scope + date so primary vs all-tabs runs don't share a file.
-    raw_csv, _ = _csv_paths(0, args.all_tabs)
+    csv_path = _csv_path(args.all_tabs)
     os.makedirs(DATA_DIR, exist_ok=True)
-    if os.path.exists(raw_csv):
-        logger.info("Using cached emails from %s (delete to re-fetch)", raw_csv)
-        df = pd.read_csv(raw_csv)
+    if args.cache and os.path.exists(csv_path):
+        logger.info("Cache hit — loading emails from %s", csv_path)
+        df = pd.read_csv(csv_path)
     else:
+        if args.cache:
+            logger.info("Cache miss (file not found) — fetching from Gmail")
         df = fetch_emails(service, id_to_name, args.max, query)
-        df.to_csv(raw_csv, index=False)
-        logger.info("Saved %d raw emails to %s", len(df), raw_csv)
+        df.to_csv(csv_path, index=False)
+        logger.info("Saved %d raw emails to %s", len(df), csv_path)
 
-    # Tagged output includes count so re-runs never overwrite each other.
-    _, tagged_csv = _csv_paths(len(df), args.all_tabs)
     client = get_ollama_client()
     df = run_classification(df, client, args.model)
-    df.to_csv(tagged_csv, index=False)
-    logger.info("Saved %d tagged emails to %s", len(df), tagged_csv)
+
+    display_summary(df)
+
+    df.to_csv(csv_path, index=False)
+    logger.info("Saved %d emails (with classifications) to %s", len(df), csv_path)
 
     if not args.dry_run:
         applied, skipped, errors = apply_labels_to_gmail(service, df, name_to_id)
-        logger.info("Applied label + mark read: %d | Skipped: %d", applied, skipped)
+        logger.info("Applied label: %d | Skipped: %d", applied, skipped)
         if errors:
             logger.warning("Errors: %d", len(errors))
             for e in errors[:5]:
