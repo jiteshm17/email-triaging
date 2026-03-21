@@ -105,7 +105,7 @@ def apply_labels_to_gmail(service, df: pd.DataFrame, name_to_id: dict) -> tuple[
             skipped += 1
             continue
         try:
-            body = {"addLabelIds": [label_id], "removeLabelIds": ["UNREAD"]}
+            body = {"addLabelIds": [label_id]}
             service.users().messages().modify(userId="me", id=msg_id, body=body).execute()
             applied += 1
         except Exception as e:
@@ -142,7 +142,7 @@ def main() -> None:
 
     if not args.dry_run:
         applied, skipped, errors = apply_labels_to_gmail(service, df, name_to_id)
-        logger.info("Applied label + mark read: %d | Skipped: %d", applied, skipped)
+        logger.info("Applied label: %d | Skipped: %d", applied, skipped)
         if errors:
             logger.warning("Errors: %d", len(errors))
             for e in errors[:5]:
